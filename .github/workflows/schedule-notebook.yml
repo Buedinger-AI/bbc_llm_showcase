@@ -1,0 +1,39 @@
+name: Run Jupyter Notebook and Upload CSV
+
+on:
+  schedule:
+    # Runs at 23:00 UTC daily (01:00 CEST)
+    - cron: '0 23 * * *'
+
+jobs:
+  run-notebook:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out the repository
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install nbconvert jupyter pandas
+
+    - name: Run Jupyter Notebook
+      run: |
+        jupyter nbconvert --to notebook --execute scrape_data.ipynb
+        jupyter nbconvert --to html scrape_data.ipynb  # Optional: convert to HTML for viewing
+
+    - name: Commit and push generated CSV
+      run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
+        git add articles.csv
+        git commit -m 'Update articles.csv'
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
