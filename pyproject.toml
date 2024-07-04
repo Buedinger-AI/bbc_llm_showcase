@@ -13,6 +13,7 @@ bs4 = "^0.0.2"
 ipykernel = "^6.29.5"
 pandas = "^2.2.2"
 nbconvert = "^7.16.4"
+jupyter = "^1.0.0"
 
 
 [build-system]
