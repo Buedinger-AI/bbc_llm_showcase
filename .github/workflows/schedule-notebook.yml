@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Check out the repository
       uses: actions/checkout@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Python
       uses: actions/setup-python@v2
@@ -40,12 +42,13 @@ jobs:
         poetry run jupyter nbconvert --to html scrape_data.ipynb  # Optional: convert to HTML for viewing
 
     - name: Commit and push generated CSV
-      run: |
-        git config --global user.name 'github-actions'
-        git config --global user.email 'github-actions@github.com'
-        git pull --rebase
-        git add articles.csv
-        git commit -m 'Update articles.csv'
-        git push
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        export PATH="$HOME/.local/bin:$PATH"
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
+        git add articles.csv
+        git commit -m 'Update articles.csv' || echo "No changes to commit"
+        git pull --rebase
+        git push origin HEAD:main
