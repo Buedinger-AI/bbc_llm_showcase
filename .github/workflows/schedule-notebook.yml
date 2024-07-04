@@ -6,6 +6,9 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch: # Manuelles Auslösen
 
+permissions:
+  contents: write
+
 jobs:
   run-notebook:
     runs-on: ubuntu-latest
@@ -22,13 +25,17 @@ jobs:
     - name: Install Poetry
       run: |
         curl -sSL https://install.python-poetry.org | python3 -
+        export PATH="$HOME/.local/bin:$PATH"
+        poetry --version
 
     - name: Install dependencies
       run: |
+        export PATH="$HOME/.local/bin:$PATH"
         poetry install
 
     - name: Run Jupyter Notebook
       run: |
+        export PATH="$HOME/.local/bin:$PATH"
         poetry run jupyter nbconvert --to notebook --execute scrape_data.ipynb
         poetry run jupyter nbconvert --to html scrape_data.ipynb  # Optional: convert to HTML for viewing
 
