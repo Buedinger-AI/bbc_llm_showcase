@@ -1,146 +1,226 @@
+# app.py
 import streamlit as st
-from utils.pinecone_util import initialize_pinecone, load_and_preprocess_data, upsert_data_to_pinecone
-from utils.rag_util import set_openai_api_key, retrieve_articles, generate_response
-from dotenv import load_dotenv
-import os
+import pandas as pd
+from src.chunking.chunking import (
+    chunk_by_recursive_character,
+    chunk_by_character,
+    chunk_by_token
+)
+# File path to your articles CSV
+file_path = 'data/articles.csv'
+filtered_articles_path = 'data/filtered_articles.csv'  # Path to the filtered articles
 
-# Laden der Umgebungsvariablen aus der .env Datei
-load_dotenv()
+# Sidebar configuration
+st.sidebar.header("Pipeline Steps")
+steps = [
+    "1. View Documents",
+    "2. Chunking / Parsing Techniques",
+    "3. Embedding Models for Vectorization",
+    "4. Vector Databases (VectorDBs)",
+    "5. Prompt Templates for Query Transformation",
+    "6. Retrieval Methods",
+    "7. Model Evaluation and Feedback",
+    "8. Performance Metrics and Comparisons",
+    "9. Error Handling and Explainability"
+]
+selected_step = st.sidebar.radio("Choose Step:", steps)
 
-# API-Schlüssel aus der .env Datei laden
-PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-PINECONE_ENV = "us-east-1"
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-INDEX_NAME = 'news-index'
+# Main area - layout for each step
+if selected_step == "1. View Documents":
+    st.header("View Documents (News Articles)")
+    st.write("Displaying the first 20 filtered articles related to 'Olympia' or 'US Wahlkampf'.")
 
-# Sicherstellen, dass alle notwendigen API-Schlüssel geladen wurden
-if not PINECONE_API_KEY or not OPENAI_API_KEY or not PINECONE_ENV:
-    st.error("Bitte stelle sicher, dass alle API-Schlüssel und die Umgebung korrekt in der .env Datei gesetzt sind.")
-    st.stop()
+    # Load the filtered articles into a DataFrame
+    try:
+        filtered_articles = pd.read_csv(filtered_articles_path)
+        top_articles = filtered_articles.head(20).drop(columns=['Unnamed: 0', 'relevant',"section"])  # Limit to the first 20 articles
+    except FileNotFoundError:
+        st.error(f"File not found: {filtered_articles_path}")
+        st.stop()
 
-# Setup Pinecone und OpenAI
-index = initialize_pinecone(PINECONE_API_KEY, PINECONE_ENV, INDEX_NAME)
-set_openai_api_key(OPENAI_API_KEY)
+    # Display articles in a table format
+    st.dataframe(top_articles)
 
-# Datenverarbeitung und Pinecone-Indexierung (Einmalige Ausführung)
-csv_file = 'articles.csv'
-df, model = load_and_preprocess_data(csv_file, model_name='text-embedding-ada-002')
-upsert_data_to_pinecone(index, df)
+    # Optionally, display individual articles with more context
+    for index, article in top_articles.iterrows():
+        st.subheader(f"Article {index + 1}: {article['headline']}")
+        st.write(f"**Published Date:** {article.get('publication_date', 'N/A')}")
+        st.write(f"**Link:** {article.get('url', 'N/A')}")
+        st.write(f"**Content:** {article['content'][:300]}...")  # Show a snippet of the content
+        st.write("---")
 
-st.success("Daten wurden erfolgreich in Pinecone hochgeladen und indiziert!")
 
-# Einführung und App-Titel
-st.title("AI News Insight Showcase")
-st.write("""
-Willkommen zur **AI News Insight Showcase** App! Diese Anwendung demonstriert moderne Generative AI-Techniken und wie sie auf Nachrichteninhalte angewendet werden können.
-Nutzen Sie die Navigationsleiste auf der linken Seite, um verschiedene Funktionen und Techniken zu erkunden.
-""")
+elif selected_step == "2. Chunking / Parsing Techniques":
+    st.header("Chunking / Parsing Techniques")
+    st.write("Explore different chunking and parsing methods using LangChain.")
 
-# Sidebar für die Navigation
-st.sidebar.title("Navigation")
-selection = st.sidebar.radio("Wähle einen Abschnitt", [
-    "Einführung",
-    "Retrieval-Augmented Generation (RAG)",
-    "In-Context Learning",
-    "Prompt Engineering",
-    "Chain-of-Thought Reasoning",
-    "Dynamic Few-Shot Learning",
-    "Long-Context Models",
-    "Multi-Modal Generative Models",
-    "Explainability in Generative AI",
-    "Contextual and Temporal Awareness",
-    "Interactive and Conversational AI"
-])
+    # Load the filtered articles
+    try:
+        filtered_articles = pd.read_csv(filtered_articles_path)
+        top_articles = filtered_articles.head(1)  # Use first article for demonstration
+        article_text = top_articles.iloc[0]['content']
+    except FileNotFoundError:
+        st.error(f"File not found: {filtered_articles_path}")
+        st.stop()
 
-# Content-Bereich je nach Auswahl in der Sidebar
-if selection == "Einführung":
-    st.header("Einführung")
-    st.write("""
-    Diese App zeigt eine Vielzahl moderner Techniken im Bereich der Generativen Künstlichen Intelligenz. 
-    Jeder Abschnitt bietet eine praktische Demonstration einer spezifischen Technik, die in der modernen 
-    NLP (Natural Language Processing) und AI (Artificial Intelligence) eingesetzt wird.
-    Nutzen Sie die Sidebar, um durch die verschiedenen Bereiche der App zu navigieren.
-    """)
-elif selection == "Retrieval-Augmented Generation (RAG)":
-    st.header("Retrieval-Augmented Generation (RAG)")
-    st.write("""
-    **Retrieval-Augmented Generation (RAG)** kombiniert das Abrufen von Informationen mit generativen Modellen, 
-    um präzise und kontextuell relevante Antworten zu generieren.
-    In diesem Abschnitt zeigen wir, wie ein Modell Inhalte aus bestehenden Nachrichtenartikeln abruft und 
-    diese verwendet, um Antworten auf benutzergenerierte Fragen zu erstellen.
-    """)
+    # Select chunking method
+    chunking_method = st.selectbox(
+        "Choose a chunking method:",
+        ["Recursive Character-Based", "Simple Character-Based", "Token-Based"]
+    )
+    
+    # Display method explanation
+    if chunking_method == "Recursive Character-Based":
+        st.markdown("**Recursive Character-Based Chunking**")
+        st.write(
+            "This method splits the text recursively by different levels (paragraphs, sentences, words) "
+            "to create chunks of a defined size. It maintains context better than simple splitting methods "
+            "and is ideal for large, structured texts.\n\n"
+            "**Advantages**: Preserves context, flexible chunk sizes.\n"
+            "**Disadvantages**: Slightly more computationally intensive."
+        )
+    elif chunking_method == "Simple Character-Based":
+        st.markdown("**Simple Character-Based Chunking**")
+        st.write(
+            "This method splits the text into chunks based on a fixed number of characters. "
+            "It's simple and fast, but doesn't consider sentence or paragraph boundaries.\n\n"
+            "**Advantages**: Easy to implement, fast processing.\n"
+            "**Disadvantages**: May split sentences or words awkwardly, losing context."
+        )
+    else:
+        st.markdown("**Token-Based Chunking**")
+        st.write(
+            "This method splits the text based on the number of tokens (words or subwords). "
+            "It's particularly useful for NLP tasks where token limits matter, such as with language models.\n\n"
+            "**Advantages**: Maintains coherence better than character-based splitting, aligns with model token limits.\n"
+            "**Disadvantages**: Can still split semantic units if not carefully set."
+        )
+    
+    # Parameters for chunking
+    chunk_size = st.slider("Select chunk size:", min_value=100, max_value=2000, value=1000)
+    chunk_overlap = st.slider("Select chunk overlap:", min_value=0, max_value=500, value=200)
 
-# Weitere Abschnitte für jede Technik
-elif selection == "In-Context Learning":
-    st.header("In-Context Learning")
-    st.write("""
-    **In-Context Learning** ermöglicht es dem Modell, durch Bereitstellung von Beispielen im Kontext 
-    bessere und spezifischere Ergebnisse zu erzielen.
-    In diesem Abschnitt werden wir Beispiele für unterschiedliche Eingabeaufforderungen testen und 
-    sehen, wie das Modell darauf reagiert.
-    """)
+    # Apply the selected chunking method with overlap
+    if chunking_method == "Recursive Character-Based":
+        chunks = chunk_by_recursive_character(article_text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    elif chunking_method == "Simple Character-Based":
+        chunks = chunk_by_character(article_text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    else:
+        chunks = chunk_by_token(article_text, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
-elif selection == "Prompt Engineering":
-    st.header("Prompt Engineering")
-    st.write("""
-    **Prompt Engineering** bezieht sich auf die Optimierung von Texteingaben (Prompts), um die 
-    bestmöglichen Ergebnisse von generativen Modellen zu erhalten. 
-    Hier können Sie verschiedene Prompts ausprobieren und die Auswirkungen auf den generierten 
-    Text beobachten.
-    """)
+    # Display chunks
+    st.write(f"Displaying chunks using {chunking_method} method:")
+    for i, chunk in enumerate(chunks):
+        st.markdown(f"**Chunk {i+1}:**")
+        st.write(chunk)
+        st.write("---")
 
-elif selection == "Chain-of-Thought Reasoning":
-    st.header("Chain-of-Thought Reasoning")
-    st.write("""
-    **Chain-of-Thought Reasoning** ermöglicht es dem Modell, komplexe Aufgaben zu lösen, 
-    indem es seine Denkprozesse explizit darstellt.
-    Hier sehen Sie, wie das Modell seine Schritte aufzeigt, um zu einer Antwort zu kommen.
-    """)
+    st.info(
+        "In addition to the chunking methods demonstrated here, LangChain also supports other types "
+        "of chunking, such as code, HTML, or Markdown. These specialized chunking methods are designed "
+        "to handle structured content types and maintain the integrity of the original formatting."
+    )   
 
-elif selection == "Dynamic Few-Shot Learning":
-    st.header("Dynamic Few-Shot Learning")
-    st.write("""
-    **Dynamic Few-Shot Learning** zeigt, wie ein Modell dynamisch wenige Beispiele auswählt, 
-    um neue Aufgaben zu lösen.
-    In diesem Abschnitt können Sie sehen, wie das Modell diese Beispiele verwendet, um 
-    sich an neue Aufgaben anzupassen.
-    """)
 
-elif selection == "Long-Context Models":
-    st.header("Long-Context Models")
-    st.write("""
-    **Long-Context Models** sind in der Lage, lange Textsequenzen zu verarbeiten und den 
-    Zusammenhang über längere Dokumente oder Konversationen hinweg zu bewahren.
-    Hier können Sie sehen, wie das Modell konsistente Inhalte über längere Texte hinweg generiert.
-    """)
+elif selected_step == "3. Embedding Models for Vectorization":
+    st.header("Embedding Models for Vectorization")
+    st.write("Explore different embedding models and their characteristics.")
 
-elif selection == "Multi-Modal Generative Models":
-    st.header("Multi-Modal Generative Models")
-    st.write("""
-    **Multi-Modal Generative Models** können Text- und Bilddaten kombinieren, um umfassendere Inhalte zu erstellen.
-    In diesem Abschnitt können Sie eine Textbeschreibung eingeben und sehen, wie das Modell dazu passende 
-    Bilder generiert.
-    """)
+    # Select embedding model
+    embedding_model = st.selectbox(
+        "Choose an embedding model:",
+        ["Word2Vec", "GloVe", "BERT", "Sentence Transformers (SBERT)", "OpenAI GPT Embeddings"]
+    )
 
-elif selection == "Explainability in Generative AI":
-    st.header("Explainability in Generative AI")
-    st.write("""
-    **Explainability in Generative AI** zielt darauf ab, die Entscheidungen von generativen Modellen transparent 
-    und nachvollziehbar zu machen.
-    Hier können Sie generierte Inhalte analysieren und verstehen, wie und warum diese erstellt wurden.
-    """)
+    # Display explanations for each embedding model
+    if embedding_model == "Word2Vec":
+        st.markdown("**Word2Vec**")
+        st.write(
+            "Word2Vec is one of the earliest models that converts words into vectors based on their "
+            "context in sentences. It uses either Skip-gram or CBOW (Continuous Bag of Words) approaches "
+            "to learn word representations.\n\n"
+            "**Advantages**: Fast and resource-efficient, good for smaller datasets.\n"
+            "**Disadvantages**: Context-independent, loses meaning of ambiguities and ignores sentence structure."
+        )
+    elif embedding_model == "GloVe":
+        st.markdown("**GloVe (Global Vectors for Word Representation)**")
+        st.write(
+            "GloVe uses a global statistical approach to capture the relationships between words across "
+            "a large corpus, producing word vectors that reflect these relationships.\n\n"
+            "**Advantages**: Considers global contexts, handles rare words better than Word2Vec.\n"
+            "**Disadvantages**: Still context-independent and static."
+        )
+    elif embedding_model == "BERT":
+        st.markdown("**BERT (Bidirectional Encoder Representations from Transformers)**")
+        st.write(
+            "BERT is a transformer-based model that processes words in their bidirectional context, "
+            "allowing it to deeply understand the meaning of words in a sentence.\n\n"
+            "**Advantages**: Context-dependent, understands the relationship between words in a sentence.\n"
+            "**Disadvantages**: Computationally intensive, slower in processing large datasets."
+        )
+    elif embedding_model == "Sentence Transformers (SBERT)":
+        st.markdown("**Sentence Transformers (e.g., SBERT)**")
+        st.write(
+            "Sentence Transformers extend BERT to create embeddings for sentences and documents, optimized "
+            "for semantic similarity tasks and retrieval applications.\n\n"
+            "**Advantages**: Faster similarity calculations, excellent for retrieval tasks.\n"
+            "**Disadvantages**: May be less precise than specialized models in certain contexts."
+        )
+    else:
+        st.markdown("**OpenAI GPT Embeddings (GPT-3, GPT-4)**")
+        st.write(
+            "OpenAI's GPT models use transformer architectures to encode words, sentences, and documents "
+            "into high-dimensional spaces, capturing complex linguistic structures and contexts.\n\n"
+            "**Advantages**: Highly powerful, understands complex linguistic structures.\n"
+            "**Disadvantages**: Very high computational and storage costs, expensive to use."
+        )
 
-elif selection == "Contextual and Temporal Awareness":
-    st.header("Contextual and Temporal Awareness in Generation")
-    st.write("""
-    **Contextual and Temporal Awareness** berücksichtigt den zeitlichen und kontextuellen Rahmen, um relevante Inhalte zu generieren.
-    In diesem Abschnitt wird gezeigt, wie das Modell den Kontext über Zeiträume hinweg nutzt, um genauere Ergebnisse zu erzielen.
-    """)
+    # Additional note on using embeddings
+    st.info(
+        "Embedding models are critical for transforming text into numerical formats that capture meaning. "
+        "Choosing the right embedding model depends on the specific application, data size, and performance requirements."
+    )
 
-elif selection == "Interactive and Conversational AI":
-    st.header("Interactive and Conversational AI")
-    st.write("""
-    **Interactive and Conversational AI** ermöglicht es Benutzern, in Echtzeit mit einem Modell zu interagieren und relevante Inhalte zu generieren.
-    Hier können Sie eine Unterhaltung mit dem Modell führen und sehen, wie es auf Ihre Anfragen reagiert.
-    """)
+elif selected_step == "4. Vector Databases (VectorDBs)":
+    st.header("Vector Databases (VectorDBs)")
+    st.write("Showcase various vector databases and their performance.")
+    # Placeholder for VectorDB details and comparisons
+    st.info("Vector database performance comparisons will be displayed here.")
+
+elif selected_step == "5. Prompt Templates for Query Transformation":
+    st.header("Prompt Templates for Query Transformation")
+    st.write("Demonstrate different prompt templates and their effects on query transformation.")
+    # Placeholder for prompt template comparisons
+    st.info("Prompt template impacts on query generation will be shown here.")
+
+elif selected_step == "6. Retrieval Methods":
+    st.header("Retrieval Methods")
+    st.write("Present different retrieval strategies and their effectiveness.")
+    # Placeholder for retrieval comparisons
+    st.info("Retrieval strategies and results will be displayed here.")
+
+elif selected_step == "7. Model Evaluation and Feedback":
+    st.header("Model Evaluation and Feedback")
+    st.write("Allow users to evaluate generated answers and provide feedback.")
+    # Placeholder for evaluation and feedback mechanism
+    generated_answer = "Sample generated answer."
+    st.write(generated_answer)
+    feedback = st.radio("How would you rate this answer?", ["Good", "Average", "Poor"])
+    comment = st.text_area("Any suggestions for improvement?")
+
+elif selected_step == "8. Performance Metrics and Comparisons":
+    st.header("Performance Metrics and Comparisons")
+    st.write("Compare the performance of different configurations across the pipeline.")
+    # Placeholder for performance metrics and charts
+    st.info("Performance metrics and comparisons will be visualized here.")
+
+elif selected_step == "9. Error Handling and Explainability":
+    st.header("Error Handling and Explainability")
+    st.write("Explain common errors and provide insights into the pipeline.")
+    # Placeholder for error handling and explainability
+    st.info("Error handling insights and explanations will be shown here.")
+
+# Footer or additional notes
+st.markdown("---")
+st.write("This app is a showcase of the different stages involved in a RAG pipeline for Q&A using BBC News data.")
 
