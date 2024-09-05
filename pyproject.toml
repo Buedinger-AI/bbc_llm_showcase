@@ -4,6 +4,7 @@ version = "0.1"
 description = "Showcasing LLM capabilities on BBC News"
 authors = ["Philippe Büdinger <philippe@buedinger-ai.de>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -15,6 +16,14 @@ pandas = "^2.2.2"
 nbconvert = "^7.16.4"
 jupyter = "^1.0.0"
 streamlit = "^1.37.1"
+pinecone-client = "^5.0.1"
+sentence-transformers = "^3.0.1"
+torch = "^2.4.0"
+torchvision = "^0.19.0"
+torchaudio = "^2.4.0"
+openai = "^1.40.6"
+python-dotenv = "^1.0.1"
+numpy = "1.26.4"
 
 
 [build-system]
