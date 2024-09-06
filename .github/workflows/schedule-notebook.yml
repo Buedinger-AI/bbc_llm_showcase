@@ -1,10 +1,10 @@
 name: Run Jupyter Notebook and Upload CSV
 
-on:
-  schedule:
-    # Runs every 5 minutes
-    - cron: '0 23 * * *'
-  workflow_dispatch: # Manuelles Auslösen
+# on:
+#   schedule:
+#     # Runs every 5 minutes
+#     - cron: '0 23 * * *'
+#   workflow_dispatch: # Manuelles Auslösen
 
 permissions:
   contents: write
